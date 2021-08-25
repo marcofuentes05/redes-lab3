@@ -26,7 +26,7 @@ class bcolors:
 # Todos los requests deben tener  este formato:
 # {
 #   from: <nombre del nodo origen>,
-#   type: 'ECHO'|'MESSAGE'|'RESPONSE'|'ECHO-RESPONSE'
+#   type: 'ECHO'|'MESSAGE'|'RESPONSE'|'ECHO-RESPONSE'|'SHARE-TABLE'
 #   payload: str -> solo si es de tipo MESSAGE
 # }
 REQUESTS = {
@@ -42,13 +42,15 @@ REQUESTS = {
     },
     'message': {
         'from': '',
+        'to': '',
         'type': 'MESSAGE',
         'payload': ''
     },
-    'response': {
+    'share-table': {
         'from': '',
-        'type': 'RESPONSE',
-        'payload': ''
+        'to': '',
+        'type': 'SHARE-TABLE',
+        'payload': '' #Es un json dumpeado con su tabla de rutas
     }
 }
 
@@ -79,10 +81,11 @@ def receive_message(port):
             s.close()
             return data.decode()
 
-def create_message(sender, type, payload):
+def create_message(sender, type, payload, to=None):
     message = copy.deepcopy(REQUESTS[type])
     message['from'] = sender
     message['payload'] = payload
+    message['to'] = to
     return message
 
 class Node:
@@ -102,12 +105,15 @@ class Node:
         self.id = id
         self.port = port
 
+        threading.Thread(target=self.share_table).start()
+
     def load_neighbors(self, neighbors):
         self.neighbors = neighbors
 
     def init_table_vector(self):
-        for neighbor in neighbors:
-            pass
+        for neighbor in self.neighbors:
+            self.echo(neighbor)
+
     def listen(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind((HOST, self.port))
@@ -129,11 +135,36 @@ class Node:
                             dataJson = json.loads(receivedData)
                             logging.debug(bcolors.OKBLUE+'[{} RECEIVED MESSAGE FROM {}] - {}'.format(self.id,addr, dataJson)+bcolors.ENDC)
                             if dataJson['type'] == 'ECHO':
-                                response_message = create_message(self.port, 'echo-response', dataJson['payload'])
-                                conn.send(str.encode(json.dumps(response_message)))
-                                logging.debug(bcolors.OKBLUE+'[{} ECHO RESPONSE SENT TO {}]'.format(self.id,addr)+bcolors.ENDC)
+                                response_message = create_message(self.id, 'echo-response', dataJson['payload'])
+                                # time.sleep(2)
+                                send_message(names['config'][dataJson['from']], response_message)
+                                logging.debug(bcolors.OKBLUE+'[{} ECHO RESPONSE SENT TO {}]'.format(self.id,dataJson['from'])+bcolors.ENDC)
                             elif dataJson['type'] == 'ECHO-RESPONSE':
-                                self.distance_vector_table[dataJson['from']] = time.perf_counter() - dataJson['payload']
+                                temp_distance = time.perf_counter() - dataJson['payload']
+                                self.distance_vector_table[dataJson['from']] = temp_distance
+                                self.paths[dataJson['from']] = dataJson['from']
+                                logging.debug(bcolors.OKBLUE+'[{}] {} IS AT DISTANCE {}'.format(self.id, dataJson['from'], temp_distance)+bcolors.ENDC)
+                            elif dataJson['type'] == 'MESSAGE':
+                                if dataJson['to'] == self.id:
+                                    logging.debug(bcolors.OKGREEN+'[{}] - MESSAGE RECEIVED FROM {}: {}'.format(self.id, dataJson['from'], dataJson['payload'])+bcolors.ENDC)
+                                else:
+                                    if dataJson['to'] in self.neighbors:
+                                        self.send(dataJson['to'], dataJson)
+                                        logging.debug(bcolors.OKCYAN+'[{}] - MESSAGE FORWARDED FROM {} TO {}'.format(self.id, dataJson['from'], dataJson['to'])+bcolors.ENDC)
+                                    else:
+                                        logging.debug(bcolors.FAIL+'[{}] - MESSAGE NOT SENT TO: {} - Not in neighbors'.format(self.id, dataJson['to'])+bcolors.ENDC)
+                            elif dataJson['type'] == 'SHARE-TABLE':
+                                logging.debug(bcolors.OKGREEN+'[{}] - TABLE RECEIVED FROM {}'.format(self.id, dataJson['from'])+bcolors.ENDC)
+                                new_table = json.loads(dataJson['payload'])
+                                sender = dataJson['from']
+                                for key in new_table:
+                                    if key in self.distance_vector_table:
+                                        actual_distance_to_sender = self.distance_vector_table[sender] if  self.distance_vector_table[sender] else 0
+                                        if (actual_distance_to_sender + new_table[key]) < self.distance_vector_table[key]:
+                                            self.distance_vector_table[key] = actual_distance_to_sender + new_table[key]
+                                            self.paths[key] = sender
+                                    else:
+                                        self.distance_vector_table[key] = new_table[key]
                         except Exception as e:
                             logging.debug(bcolors.FAIL+'[{}] - ERROR: {}'.format(self.id, e)+bcolors.ENDC)
                             logging.debug(bcolors.FAIL+'[{}] - ERROR: Message received from {} could not be decoded'.format(self.id, addr)+bcolors.ENDC)
@@ -151,6 +182,30 @@ class Node:
         # else:
         #     self.distance_vector_table[to] = float('inf')
 
+    def send(self, to, message):
+        my_message = create_message(self.id, 'message', message, to)
+        if to in self.neighbors:
+            send_message(names['config'][to], my_message)
+            logging.debug(bcolors.OKCYAN+'[{}] - MESSAGE SENT TO {} VIA DIRECT NEIGHBOR'.format(self.id, to)+bcolors.ENDC)
+        else:
+            if to in self.paths:
+                neighbor = self.paths[to]
+                send_message(names['config'][neighbor], my_message)
+                logging.debug(bcolors.OKCYAN+'[{}] - MESSAGE FORWARDED TO {}'.format(self.id, neighbor)+bcolors.ENDC)
+            else:
+                logging.debug(bcolors.WARNING+'[{}] - COULD NOT FIND A ROUTE TO {} - FLOODING'.format(self.id, to)+bcolors.ENDC)
+                for neighbor in self.neighbors:
+                    send_message(names['config'][neighbor], my_message)
+
+    def share_table(self):
+        time.sleep(20)
+        while True:
+            message = create_message(self.id, 'share-table', json.dumps(self.distance_vector_table))
+            for neighbor in self.neighbors:
+                send_message(names['config'][neighbor], message)
+                logging.debug(bcolors.OKGREEN+'[{}] - Table sent to: {}'.format(self.id, neighbor)+bcolors.ENDC)
+            time.sleep(20)
+
 if __name__ == '__main__':
 
     # Cargando nodos y topologia de red
@@ -162,35 +217,17 @@ if __name__ == '__main__':
     topo = json.load(topo_file)
     topo_file.close()
 
-    # print(names)
-    # print(topo)
     nodes = []
     thread_pool = []
     for id, node in enumerate(names['config']):
-        nodes.append(Node(id, int(names['config'][node])))
+        nodes.append(Node(node, int(names['config'][node])))
         nodes[-1].load_neighbors(topo['config'][node])
         thread_pool.append(threading.Thread(target=nodes[-1].listen)) # Agarro el nodo que acabo de agregar (tiene el indice -1) y agrego el hilo
         thread_pool[-1].start()
     
+    time.sleep(5)
+    for node in nodes:
+        node.init_table_vector()
     
-    # time.sleep(5)
-    nodes[0].echo("C")
-    # node_0 = Node(0, 3001)
-    # node_1 = Node(1, 3002)
-
-
-    # thread_1 = threading.Thread(target=node_1.listen)
-    # thread_1.start()
-
-    # thread_2 = threading.Thread(target=node_1.echo, args=(3001, b'Message Test'))
-    # time.sleep(5)
-    # thread_2.start()
-    # for i in range(50):
-    #     # print(i)
-    #     time.sleep(2)
-
-    # print(names['config'])
-    # for thread in thread_pool:
-    #     thread.join()
-    # thread_0.join()
-    # thread_1.join()
+    time.sleep(25)
+    nodes[0].send('B', 'Hello, this is a test from A to C')
