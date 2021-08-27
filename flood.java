@@ -2,6 +2,8 @@ import org.jivesoftware.smack.*;
 import org.jivesoftware.smack.packet.Message;
 
 import java.util.*;
+import java.io.File;
+import java.io.FileNotFoundException;
 
 class Main {
     static boolean connect(XMPPConnection con){
@@ -31,6 +33,19 @@ class Main {
             return false;
         }
     }
+    static boolean readFile(String fileName){
+        try{
+            File myFile = new File(fileName);
+            Scanner myReader = new Scanner(myFile);
+            while (myReader.hasNextLine()){
+                String data = myReader.nextLine();
+                System.out.println(data);
+            }
+        }catch (FileNotFoundException e){
+            System.out.println("File not found");
+        }
+        return true;
+    }
     public static void main(String args[]){
         XMPPConnection con = new XMPPConnection("alumchat.xyz");
         Map<String, ArrayList<String>> neighbours = new HashMap<>();
@@ -59,18 +74,53 @@ class Main {
             add("rodrigoe@alumchat.xyz");
         }});
         if (connect(con)){
-            String userName = "rodrigoe@alumchat.xyz";
+            Scanner optionScanner = new Scanner(System.in);
+            System.out.println("Ingrese 1 para unirse a una estructura existente");
+            System.out.println("Ingrese 2 para cargar una estructura nueva");
+            System.out.println("Ingrese 3 para utilizar la estructura de prueba");
+            String mainOption = optionScanner.nextLine();
+            String userName = "rodrigog@alumchat.xyz";
+            String password = "redes";
+            String topoFileName = "topo-1.txt";
+            String namesFileName = "names-1.txt";
+            String newNeighbours = "";
+            if(mainOption.equals("1")){
+                System.out.println("Ingrese nombre de usuario");
+                userName = optionScanner.nextLine();
+                System.out.println("Ingrese la contraseña");
+                password = optionScanner.nextLine();
+                System.out.println("Ingrese sus vecinos (separados por coma y sin espacios)");
+                System.out.println("Ejemplo: abc18123@alumchat.xyz,bcd18321@alumchat.xyz");
+                newNeighbours = optionScanner.nextLine();
+            }else if (mainOption.equals("2")){
+                System.out.println("Ingrese el nombre del archivo con la topología");
+                topoFileName = optionScanner.nextLine();
+                System.out.println("Ingrese el nombre del archivo con los nombres");
+                namesFileName = optionScanner.nextLine();
+                System.out.println("Ingrese nombre de usuario");
+                userName = optionScanner.nextLine();
+                System.out.println("Ingrese la contraseña");
+                password = optionScanner.nextLine();
+            }
             ArrayList<String> seenMessages = new ArrayList<>();
-            if (login(con, userName, "redes")) {
+            if (login(con, userName, password)) {
                 ChatManager chatManager = con.getChatManager();
+                String finalUserName = userName;
                 Thread newThread = new Thread(()->{
                     /*
-                    * Mensajs recibidos
-                    * 0 es el último emisor
-                    * 1 es el emisor original
-                    * 2 es el receptor final
-                    * 3 es el mensaje
-                    * 4 es el uuid, usado para ver si ya se vio este mensaje
+                    * Mensajes recibidos
+                    * Posición  Descipción
+                    * 0         Tipo de mensaje
+                    * 1         Último emisor
+                    * 2         Emisor original
+                    * 3         Receptor final
+                    * 4         Mensaje
+                    * 5         UUID usado para ver si ya se vio este mensaje
+                    * */
+                    /* Mensajes para crear vecinos
+                    * Posición  Descipción
+                    * 0         Tipo de mensaje
+                    * 1         Nombre de nuevo vecino
                     * */
                     chatManager.addChatListener(
                             new ChatManagerListener() {
@@ -81,20 +131,25 @@ class Main {
                                         public void processMessage(Chat chat, Message msg) {
                                             if(msg.getBody() != null){
                                                 String[] parts = msg.getBody().split("-");
-                                                if(!seenMessages.contains(parts[4])){
-                                                    if(userName.equals(parts[2])){
-                                                        System.out.println("Youve got mail");
-                                                        seenMessages.add(parts[4]);
-                                                        System.out.println(chat.getParticipant() + " : " + parts[3]);
-                                                    }else{
-                                                        seenMessages.add(parts[4]);
-                                                        String newMessage = userName + "-" + parts[1] + "-" + parts[2] + "-" + parts[3] + "-" + parts[4];
-                                                        for(String neighbour: neighbours.get(userName)){
-                                                            if(!parts[0].equals(neighbour)){
-                                                                sendMessage(con, neighbour, newMessage);
+                                                if(parts[0].equals("0")){
+                                                    if(!seenMessages.contains(parts[5])){
+                                                        if(finalUserName.equals(parts[3])){
+                                                            System.out.println("Youve got mail");
+                                                            seenMessages.add(parts[5]);
+                                                            System.out.println(parts[2] + " : " + parts[4]);
+                                                        }else{
+                                                            seenMessages.add(parts[5]);
+                                                            String newMessage = "0-" + finalUserName + "-" + parts[2] + "-" + parts[3] + "-" + parts[4] + "-" + parts[5];
+                                                            for(String neighbour: neighbours.get(finalUserName)){
+                                                                if(!parts[1].equals(neighbour)){
+                                                                    sendMessage(con, neighbour, newMessage);
+                                                                }
                                                             }
                                                         }
                                                     }
+                                                }
+                                                else if (parts[0].equals("1")){
+                                                    neighbours.get(finalUserName).add(parts[1]);
                                                 }
                                             }
                                         }
@@ -104,12 +159,17 @@ class Main {
                     );
                 });
                 newThread.start();
-                System.out.println(userName.toString());
-                System.out.println("now");
-                Scanner optionScanner = new Scanner(System.in);
                 String optionInput = "";
                 String receiver = "";
                 String message = "";
+                if(mainOption.equals("1")){
+                    ArrayList<String> newNeighboursList = new ArrayList<>();
+                    for (String newNeighbour :newNeighbours.split(",")){
+                        sendMessage(con, newNeighbour, "1-"+userName);
+                        newNeighboursList.add(newNeighbour);
+                    }
+                    neighbours.put(userName, newNeighboursList);
+                }
                 while (true){
                     System.out.println("Presione enter para enviar un mensaje");
                     optionInput = optionScanner.nextLine();
@@ -118,7 +178,7 @@ class Main {
                     System.out.println("Ingrese el mensaje a enviar");
                     message = optionScanner.nextLine();
                     String messageId = UUID.randomUUID().toString().replace("-", "_");
-                    String finalMessage = userName + "-" + userName + "-" + receiver + "-" + message + "-" + messageId;
+                    String finalMessage = "0-" + userName + "-" + userName + "-" + receiver + "-" + message + "-" + messageId;
                     seenMessages.add(messageId);
                     for(String contact:neighbours.get(userName)){
                         sendMessage(con, contact, finalMessage);
