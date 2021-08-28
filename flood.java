@@ -79,7 +79,7 @@ class Main {
             System.out.println("Ingrese 2 para cargar una estructura nueva");
             System.out.println("Ingrese 3 para utilizar la estructura de prueba");
             String mainOption = optionScanner.nextLine();
-            String userName = "rodrigog@alumchat.xyz";
+            String userName = "rodrigoa@alumchat.xyz";
             String password = "redes";
             String topoFileName = "topo-1.txt";
             String namesFileName = "names-1.txt";
@@ -101,6 +101,11 @@ class Main {
                 userName = optionScanner.nextLine();
                 System.out.println("Ingrese la contraseña");
                 password = optionScanner.nextLine();
+            }else if(mainOption.equals("3")){
+                System.out.println("Ingrese el de usuario para hacer login");
+                System.out.println("Opciones: rodrigoa@alumchat.xyz, rodrigob@alumchat.xyz...rodrigof@alumchat.xyz");
+                System.out.println("No es necesario ingresar contraseña para estos usuarios, ya que únicamente son para pruebas");
+                userName = optionScanner.nextLine();
             }
             ArrayList<String> seenMessages = new ArrayList<>();
             if (login(con, userName, password)) {
@@ -171,6 +176,7 @@ class Main {
                     neighbours.put(userName, newNeighboursList);
                 }
                 while (true){
+                    System.out.println("Se inició sesión como " + userName);
                     System.out.println("Presione enter para enviar un mensaje");
                     optionInput = optionScanner.nextLine();
                     System.out.println("Ingrese el receptor de su mensaje");
