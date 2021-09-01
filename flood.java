@@ -31,7 +31,7 @@ class Main {
      */
     static boolean login(XMPPConnection con, String userName, String password){
         try{
-            con.login(userName, "redes");
+            con.login(userName, password);
             return true;
         }catch(Exception error){
             return false;
