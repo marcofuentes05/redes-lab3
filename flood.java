@@ -1,5 +1,8 @@
+import netscape.javascript.JSObject;
 import org.jivesoftware.smack.*;
 import org.jivesoftware.smack.packet.Message;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.*;
 import java.io.File;
@@ -52,26 +55,62 @@ class Main {
             return false;
         }
     }
-    static boolean readFile(String fileName){
+    static HashMap<String, String> readNameFile(String fileName){
+        StringBuilder finalString = new StringBuilder();
+        HashMap<String, String> names = new HashMap<>();
         try{
             File myFile = new File(fileName);
             Scanner myReader = new Scanner(myFile);
             while (myReader.hasNextLine()){
                 String data = myReader.nextLine();
-                System.out.println(data);
+                finalString.append(data);
+            }
+            JSONObject jObject = new JSONObject(finalString.toString());
+            for (Iterator<String> it = jObject.getJSONObject("config").keys(); it.hasNext(); ) {
+                String key = it.next();
+                names.put(key, jObject.getJSONObject("config").get(key).toString());
             }
         }catch (FileNotFoundException e){
             System.out.println("File not found");
         }
-        return true;
+        System.out.println(names.toString());
+        return names;
+    }
+    static HashMap<String, ArrayList<String>> readTopoFile(String fileName, Map<String, String> nameKey){
+        StringBuilder finalString = new StringBuilder();
+        HashMap<String, ArrayList<String>> topo = new HashMap<>();
+        try{
+            File myFile = new File(fileName);
+            Scanner myReader = new Scanner(myFile);
+            while (myReader.hasNextLine()){
+                String data = myReader.nextLine();
+                finalString.append(data);
+            }
+            JSONObject jObject = new JSONObject(finalString.toString());
+            for (Iterator<String> it = jObject.getJSONObject("config").keys(); it.hasNext(); ) {
+                String key = it.next();
+                String emailKey = nameKey.get(key);
+                JSONArray arr = jObject.getJSONObject("config").getJSONArray(key);
+                ArrayList<String> newNeighbours = new ArrayList<>();
+                for (int i = 0; i < arr.length(); i++) {
+                    newNeighbours.add(nameKey.get(arr.get(i).toString()));
+                }
+                topo.put(emailKey, newNeighbours);
+            }
+        }catch (FileNotFoundException e){
+            System.out.println("File not found");
+        }
+        System.out.println(topo.toString());
+        return topo;
     }
     public static void main(String args[]){
         //Connects to server
         XMPPConnection con = new XMPPConnection("alumchat.xyz");
         Map<String, ArrayList<String>> neighbours = new HashMap<>();
+        Map<String, String> nameKey = new HashMap<>();
         //Create HashMap to model existing connections
         //Each node only accesses its own connections
-        neighbours.put("rodrigoa@alumchat.xyz", new ArrayList<String>(){{
+/*        neighbours.put("rodrigoa@alumchat.xyz", new ArrayList<String>(){{
             add("rodrigob@alumchat.xyz");
         }});
         neighbours.put("rodrigob@alumchat.xyz", new ArrayList<String>(){{
@@ -94,7 +133,7 @@ class Main {
         neighbours.put("rodrigof@alumchat.xyz", new ArrayList<String>(){{
             add("rodrigoc@alumchat.xyz");
             add("rodrigoe@alumchat.xyz");
-        }});
+        }});*/
         if (connect(con)){
             //Main menu
             Scanner optionScanner = new Scanner(System.in);
@@ -120,10 +159,14 @@ class Main {
                 newNeighbours = optionScanner.nextLine();
             //Load custom topology, pending implementation for lab4
             }else if (mainOption.equals("2")){
-                System.out.println("Ingrese el nombre del archivo con la topología");
-                topoFileName = optionScanner.nextLine();
                 System.out.println("Ingrese el nombre del archivo con los nombres");
                 namesFileName = optionScanner.nextLine();
+                nameKey = readNameFile(namesFileName);
+
+                System.out.println("Ingrese el nombre del archivo con la topología");
+                topoFileName = optionScanner.nextLine();
+                neighbours = readTopoFile(topoFileName, nameKey);
+
                 System.out.println("Ingrese nombre de usuario");
                 userName = optionScanner.nextLine();
                 System.out.println("Ingrese la contraseña");
@@ -140,6 +183,7 @@ class Main {
             if (login(con, userName, password)) {
                 ChatManager chatManager = con.getChatManager();
                 String finalUserName = userName;
+                Map<String, ArrayList<String>> finalNeighbours = neighbours;
                 Thread newThread = new Thread(()->{
                     /*
                     * Message received format
@@ -184,7 +228,7 @@ class Main {
                                                             seenMessages.add(parts[5]);
                                                             String newMessage = "0-" + finalUserName + "-" + parts[2] + "-" + parts[3] + "-" + parts[4] + "-" + parts[5];
                                                             //Sends to all neighbours
-                                                            for(String neighbour: neighbours.get(finalUserName)){
+                                                            for(String neighbour: finalNeighbours.get(finalUserName)){
                                                                 //Except last sender
                                                                 if(!parts[1].equals(neighbour)){
                                                                     sendMessage(con, neighbour, newMessage);
@@ -196,7 +240,7 @@ class Main {
                                                     }
                                                 }
                                                 else if (parts[0].equals("1")){
-                                                    neighbours.get(finalUserName).add(parts[1]);
+                                                    finalNeighbours.get(finalUserName).add(parts[1]);
                                                 }
                                             }
                                         }
@@ -222,6 +266,7 @@ class Main {
                 while (true){
                     //Loop to receive and send messages
                     System.out.println("Se inició sesión como " + userName);
+                    System.out.println("Está conectado a: " + neighbours.get(userName));
                     //Program stops here until something is typed
                     System.out.println("Presione enter para enviar un mensaje");
                     optionInput = optionScanner.nextLine();
