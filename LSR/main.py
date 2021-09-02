@@ -7,7 +7,7 @@ from lsr import *
 
 if __name__ == '__main__':
     print( " ------------------------------")
-    print("--- Welcome to the Chat! ---")
+    print(" Link State Routing Chat")
     print( " ------------------------------")
     jid = input('Enter your jid: ')
     password = getpass('Enter your password --> ')
