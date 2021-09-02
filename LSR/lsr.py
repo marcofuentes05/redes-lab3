@@ -53,12 +53,11 @@ class LSRClient(slixmpp.ClientXMPP):
         send = await ainput()
         # -------------------------------------------------------
         if send != None:
-            message = await ainput('Type your message: ')
-
-        #Waiting some time so that the network converges
-        print("Waiting for network to converge")
+            message = await ainput('Enter your message: ')
+#--------------------------------------------------------------
+        print("Just a moment... ")
         await sleep(17)
-        print("Network converged, sending message")
+        print("Sending message ... ")
         self.send_chat_message(self.boundjid.bare,send,steps=1,visited_nodes=[self.boundjid.bare],message=message)
         print("Press enter to exit")
         exit = await ainput()
