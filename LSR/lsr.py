@@ -1,3 +1,9 @@
+# -------------------------------------------------------  
+#Link state routing
+#References
+#https://github.com/ChampionTej05/Link-State-Routing-Simulation-in-Python
+#https://www.geeksforgeeks.org/shortest-path-problem-between-routing-terminals-implementation-in-python/
+# -------------------------------------------------------  
 import asyncio
 from asyncio.tasks import sleep
 import slixmpp
@@ -26,7 +32,7 @@ class LSRClient(slixmpp.ClientXMPP):
         self.neighbours_IDS = get_neighbors(self.topo_file, self.id)
         self.neighbours = []
         self.neighbours_JID()
-
+# -------------------------------------------------------
     async def start(self, event):
         self.send_presence()
         await self.get_roster()
@@ -43,8 +49,9 @@ class LSRClient(slixmpp.ClientXMPP):
 
         await sleep(2)
 
-        print("Type the jid of the user you want to message (or wait until someone messages you!)")
+        print("Enter the username with who you want to chat --> ")
         send = await ainput()
+        # -------------------------------------------------------
         if send != None:
             message = await ainput('Type your message: ')
 
@@ -52,18 +59,40 @@ class LSRClient(slixmpp.ClientXMPP):
         print("Waiting for network to converge")
         await sleep(17)
         print("Network converged, sending message")
-
         self.send_chat_message(self.boundjid.bare,send,steps=1,visited_nodes=[self.boundjid.bare],message=message)
-        
-        print("press enter to exit")
+        print("Press enter to exit")
         exit = await ainput()
         self.disconnect()
+# -------------------------------------------------------
+    def find_node_in_network(self, id):
+        for i in range(len(self.network)):
+            node = self.network[i]
+            if id in node['from']:
+                return node
+        return False
+# -------------------------------------------------------
+    async def flood_LSP(self, lsp, new):
+        for neighbour in self.neighbours:
+            if new and neighbour != lsp['from']:
+                    self.send_message(mto =neighbour,mbody=object_to_json(lsp),mtype='chat')
 
     def neighbours_JID(self):
         for id in self.neighbours_IDS:
             neighbour_JID = get_JID(self.names_file, id)
             self.neighbours.append(neighbour_JID)
-
+# -------------------------------------------------------
+    async def send_hello_msg(self,to, steps = 1):
+        you = self.boundjid.bare
+        to = to 
+        json = {
+            'type': hello,
+            'from':you,
+            'to': to,
+            'steps': steps
+        }
+        to_send = object_to_json(json)
+        self.send_message(mto = to, mbody=to_send, mtype='chat')
+# -------------------------------------------------------
     async def message(self, msg):
         body = json_to_object(msg['body'])
         if body['type'] == hello:
@@ -91,20 +120,7 @@ class LSRClient(slixmpp.ClientXMPP):
                 print('Got a message!')
                 print(body['from'], " : ", body['mesage'])
                 print(body)
-
-        
-    async def send_hello_msg(self,to, steps = 1):
-        you = self.boundjid.bare
-        to = to 
-        json = {
-            'type': hello,
-            'from':you,
-            'to': to,
-            'steps': steps
-        }
-        to_send = object_to_json(json)
-        self.send_message(mto = to, mbody=to_send, mtype='chat')
-    
+# -------------------------------------------------------    
     async def send_echo_message(self, to, type ,steps = 1):
         you = self.boundjid.bare
         to = to 
@@ -125,7 +141,7 @@ class LSRClient(slixmpp.ClientXMPP):
                 self.send_message(mto =neighbour,mbody=lsp_to_send,mtype='chat')
             await sleep(2)
             self.LSP['sequence'] += 1
-    
+# -------------------------------------------------------    
     def send_chat_message(self,source,to,steps=0, distance = 0, visited_nodes = [],message="Hola mundo"):
         body ={
             'type':message_type,
@@ -140,7 +156,7 @@ class LSRClient(slixmpp.ClientXMPP):
         body['distance'] += self.LSP['neighbours'][path[1]['from']]
         to_send = object_to_json(body)
         self.send_message(mto=path[1]['from'],mbody = to_send,mtype='chat')
-
+# -------------------------------------------------------  
     async def update_network(self, lsp):
         for i in range(0,len(self.network)):
             node = self.network[i]
@@ -153,7 +169,7 @@ class LSRClient(slixmpp.ClientXMPP):
                     return None
         self.network.append(lsp)
         return 1
-    
+# -------------------------------------------------------      
     def calculate_path(self, source, dest):
         distance = 0
         visited = []
@@ -180,14 +196,3 @@ class LSRClient(slixmpp.ClientXMPP):
             distance += min_distance
         return visited
 
-    def find_node_in_network(self, id):
-        for i in range(len(self.network)):
-            node = self.network[i]
-            if id in node['from']:
-                return node
-        return False
-
-    async def flood_LSP(self, lsp, new):
-        for neighbour in self.neighbours:
-            if new and neighbour != lsp['from']:
-                    self.send_message(mto =neighbour,mbody=object_to_json(lsp),mtype='chat')

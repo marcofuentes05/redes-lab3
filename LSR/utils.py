@@ -1,4 +1,9 @@
-
+# -------------------------------------------------------  
+#Link state routing
+#References
+#https://github.com/ChampionTej05/Link-State-Routing-Simulation-in-Python
+#https://www.geeksforgeeks.org/shortest-path-problem-between-routing-terminals-implementation-in-python/
+# -------------------------------------------------------  
 import json
 
 hello = 'HELLO'
@@ -11,12 +16,12 @@ lsp = 'LSP'
 def json_to_object(jason_string):
     object = json.loads(jason_string)
     return object
-
+# -------------------------------------------------------  
 
 def object_to_json(object):
     json_string = json.dumps(object)
     return json_string
-
+# -------------------------------------------------------  
 
 def get_JID(names_file,ID):
 	file = open(names_file, "r")
@@ -27,8 +32,8 @@ def get_JID(names_file,ID):
 		JID = names[ID]
 		return(JID)
 	else:
-		raise Exception('The file does not have a valid format for names')
-
+		raise Exception('Invalid file')
+# -------------------------------------------------------  
 
 def get_ID(names_file, JID):
 	file = open(names_file, "r")
@@ -40,9 +45,8 @@ def get_ID(names_file, JID):
 		name = JIDS[JID]
 		return(name)
 	else:
-		raise Exception('The file has not a valid format for names')
-
-
+		raise Exception('Invalid file')
+# -------------------------------------------------------  
 
 def get_neighbors(topology_file, ID):
 	file = open(topology_file, "r")
@@ -53,5 +57,5 @@ def get_neighbors(topology_file, ID):
 		neighbors_IDs = names[ID]
 		return(neighbors_IDs)
 	else:
-		raise Exception('The file has not a valid format for topology')
+		raise Exception('Invalid file')
 	return  
