@@ -1,0 +1,1 @@
+{"type":"names", "config":{'A': 'zav18893@alumchat.xyz', 'B': 'zav18893_1@alumchat.xyz', 'C': 'zav18893_2@alumchat.xyz', 'D': 'zav18893_3@alumchat.xyz', 'E': 'zav18893_4@alumchat.xyz', 'F': 'zav18893_5@alumchat.xyz', 'G': 'zav18893_6@alumchat.xyz', 'H': 'zav18893_7@alumchat.xyz', 'I': 'zav18893_8@alumchat.xyz'} }
